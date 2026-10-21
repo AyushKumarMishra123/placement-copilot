@@ -1,0 +1,43 @@
+services:
+  - type: web
+    name: placement-copilot-server
+    runtime: node
+    rootDir: server
+    buildCommand: npm ci --omit=dev
+    startCommand: node server.js
+    plan: starter
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CLIENT_URL
+        sync: false
+      - key: STORAGE_PROVIDER
+        value: gridfs
+      - key: AI_PROVIDER
+        value: rules_only
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-1.5-flash
+      - key: ADMIN_REGISTRATION_SECRET
+        sync: false
+      - key: AI_SERVICE_URL
+        value: http://localhost:8000
+
+  - type: web
+    name: placement-copilot-ai
+    runtime: docker
+    rootDir: ai-service
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 8000

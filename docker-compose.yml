@@ -1,0 +1,90 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:6.0
+    container_name: placement_copilot_mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - placement_copilot_network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: placement_copilot_ai_service
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+    networks:
+      - placement_copilot_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: placement_copilot_server
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      ai-service:
+        condition: service_started
+    ports:
+      - "5001:5001"
+    environment:
+      - NODE_ENV=production
+      - PORT=5001
+      - MONGODB_URI=mongodb://mongodb:27017/placement_copilot
+      - JWT_SECRET=production_super_secure_jwt_secret_change_me
+      - CLIENT_URL=http://localhost
+      - AI_SERVICE_URL=http://ai-service:8000
+      - AI_PROVIDER=rules_only
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - ADMIN_REGISTRATION_SECRET=msot_admin_secret_placement_copilot_2026
+      - JOB_SOURCES_ENABLED=greenhouse,lever
+      - GREENHOUSE_BOARDS=canonical,stripe
+      - LEVER_COMPANIES=leverdemo
+    networks:
+      - placement_copilot_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: placement_copilot_client
+    restart: unless-stopped
+    depends_on:
+      - server
+    ports:
+      - "80:80"
+    networks:
+      - placement_copilot_network
+
+networks:
+  placement_copilot_network:
+    driver: bridge
+
+volumes:
+  mongo_data:
